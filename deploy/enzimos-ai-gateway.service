@@ -1,0 +1,27 @@
+[Unit]
+Description=enzimOS AI provider gateway
+After=enzimos-ai-setup.service
+ConditionPathExists=%E/enzimos/ai-providers.json
+PartOf=enzui-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/enzimos-ai-gateway --config "%E/enzimos/ai-providers.json" --preferences %S/enzimos-ai-gateway/preferences.json --socket %t/enzimos-ai-gateway/service.sock
+RuntimeDirectory=enzimos-ai-gateway
+RuntimeDirectoryMode=0700
+StateDirectory=enzimos-ai-gateway
+StateDirectoryMode=0700
+UMask=0077
+Nice=10
+CPUWeight=20
+MemoryMax=128M
+TasksMax=32
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%t/enzimos-ai-gateway
+KillMode=control-group
+Restart=on-failure
+[Install]
+WantedBy=enzui-session.target
