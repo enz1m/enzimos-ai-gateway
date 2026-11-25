@@ -144,6 +144,17 @@ fn parse_url(value: &str) -> Result<Url, String> {
     })
 }
 
+fn local_provider(config: &Value, default: Value) -> Value {
+    let is_local = |name: &str| config["providers"][name]["kind"] == "local";
+    if default.as_str().is_some_and(is_local) {
+        return default;
+    }
+    config["providers"]
+        .as_object()
+        .and_then(|providers| providers.keys().find(|name| is_local(name)))
+        .map_or(default, |name| json!(name))
+}
+
 /// Pick the configured provider; `provider` is removed from the request body.
 pub fn route(config: &Value, body: &mut Map<String, Value>, path: &str) -> Result<Target, String> {
     if ![
@@ -159,7 +170,12 @@ pub fn route(config: &Value, body: &mut Map<String, Value>, path: &str) -> Resul
         .get("default_provider")
         .cloned()
         .unwrap_or(json!("local"));
-    let name = body.remove("provider").unwrap_or(default);
+    let name = match body.remove("provider") {
+        Some(name) => name,
+        // Speech has only a local adapter, so it never follows a cloud default.
+        None if path == "/v1/audio/transcriptions" => local_provider(config, default),
+        None => default,
+    };
     let provider = name
         .as_str()
         .and_then(|n| config["providers"].get(n))

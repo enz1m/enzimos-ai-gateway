@@ -16,7 +16,9 @@ No provider credentials or prompt contents are logged or shipped in images.
 `provider` chooses a configured provider; it is removed before sending the request.
 The default is `local`. Remote endpoints use HTTPS. Loopback endpoints can use HTTP.
 Responses and Chat are explicit capabilities; the gateway does not pretend their
-request/event formats are identical. Cloud PCM speech adaptation remains future work.
+request/event formats are identical. Cloud PCM speech adaptation remains future work,
+so a transcription without `provider` uses a local provider even when the default is
+a cloud provider.
 
 ## Experimental ChatGPT account adapter
 

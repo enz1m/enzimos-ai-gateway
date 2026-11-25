@@ -45,6 +45,31 @@ fn local_default_and_explicit_cloud_without_fallback() {
 }
 
 #[test]
+fn speech_stays_local_under_a_cloud_default() {
+    let mut c = config("/run/x.sock", "https://api.example.com/v1/");
+    c["default_provider"] = json!("cloud");
+    assert_eq!(
+        route(&c, &mut body(json!({})), "/v1/audio/transcriptions").unwrap(),
+        Target::Local {
+            socket: "/run/x.sock".into(),
+            path: "/v1/audio/transcriptions".into()
+        }
+    );
+    assert!(matches!(
+        route(&c, &mut body(json!({})), "/v1/chat/completions").unwrap(),
+        Target::Remote { .. }
+    ));
+    assert!(
+        route(
+            &c,
+            &mut body(json!({"provider": "cloud"})),
+            "/v1/audio/transcriptions"
+        )
+        .is_err()
+    );
+}
+
+#[test]
 fn refusals_for_http_disabled_login_and_protocols() {
     let c = config("/run/x.sock", "http://api.example.com/v1");
     let refuse =
