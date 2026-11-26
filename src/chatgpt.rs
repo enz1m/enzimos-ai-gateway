@@ -708,10 +708,30 @@ pub(crate) fn responses_body(chat: &Value) -> Result<Value, String> {
             .join(""),
         _ => String::new(),
     };
+    let user_content = |content: &Value| -> Result<Value, String> {
+        let Some(parts) = content.as_array() else {
+            return Ok(json!(text(content)));
+        };
+        let mut translated = Vec::with_capacity(parts.len());
+        for part in parts {
+            translated.push(match part["type"].as_str() {
+                Some("text") => json!({"type": "input_text", "text": part["text"].as_str().ok_or("message text required")?}),
+                Some("image_url") => {
+                    let url = part["image_url"]["url"]
+                        .as_str()
+                        .filter(|url| url.starts_with("data:image/jpeg;base64,") || url.starts_with("data:image/png;base64,"))
+                        .ok_or("embedded screenshot image required")?;
+                    json!({"type": "input_image", "image_url": url, "detail": "auto"})
+                }
+                _ => return Err("unsupported user content part".into()),
+            });
+        }
+        Ok(json!(translated))
+    };
     for message in chat["messages"].as_array().ok_or("messages required")? {
         match message["role"].as_str().unwrap_or_default() {
             "system" | "developer" => instructions.push(text(&message["content"])),
-            "user" => input.push(json!({"role": "user", "content": text(&message["content"])})),
+            "user" => input.push(json!({"role": "user", "content": user_content(&message["content"])?})),
             "assistant" => {
                 let said = text(&message["content"]);
                 if !said.is_empty() {
@@ -867,6 +887,27 @@ mod tests {
             request["tools"][0]["tools"][0],
             json!({"type": "function", "name": "file_read", "description": "Read", "parameters": {"type": "object"}})
         );
+    }
+
+    #[test]
+    fn plan_requests_keep_screenshot_images_in_the_model_context() {
+        let image = "data:image/jpeg;base64,AA==";
+        let chat = |url: &str| {
+            json!({"model": "gpt-5", "messages": [
+                {"role": "user", "content": [
+                    {"type": "text", "text": "Visual result"},
+                    {"type": "image_url", "image_url": {"url": url}},
+                ]}
+            ]})
+        };
+        assert_eq!(
+            responses_body(&chat(image)).unwrap()["input"][0]["content"],
+            json!([
+                {"type": "input_text", "text": "Visual result"},
+                {"type": "input_image", "image_url": image, "detail": "auto"}
+            ])
+        );
+        assert!(responses_body(&chat("https://example.org/capture.jpg")).is_err());
     }
 
     #[test]
