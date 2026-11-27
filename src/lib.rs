@@ -489,10 +489,10 @@ impl Gateway {
         if request.method != "POST" {
             return Err(Failure::Bad("unsupported request".into()));
         }
-        let limit = if matches!(path, "/v1/preferences" | "/v1/models/warmup") {
-            4096
-        } else {
-            3 * 1024 * 1024
+        let limit = match path {
+            "/v1/preferences" => 4096,
+            "/v1/models/warmup" => 8192,
+            _ => 3 * 1024 * 1024,
         };
         let body = http::read_body(reader, &request, limit)
             .await
