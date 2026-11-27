@@ -160,6 +160,7 @@ pub fn route(config: &Value, body: &mut Map<String, Value>, path: &str) -> Resul
     if ![
         "/v1/chat/completions",
         "/v1/responses",
+        "/v1/models/warmup",
         "/v1/audio/transcriptions",
     ]
     .contains(&path)
@@ -181,6 +182,9 @@ pub fn route(config: &Value, body: &mut Map<String, Value>, path: &str) -> Resul
         .and_then(|n| config["providers"].get(n))
         .ok_or("unknown provider")?;
     let kind = provider["kind"].as_str().unwrap_or_default();
+    if path == "/v1/models/warmup" && (name != "local" || kind != "local") {
+        return Err("model warm-up requires the local provider".into());
+    }
     if kind == "chatgpt-login" {
         if provider.get("enabled") != Some(&json!(true)) {
             return Err("cloud provider is disabled".into());
@@ -485,7 +489,7 @@ impl Gateway {
         if request.method != "POST" {
             return Err(Failure::Bad("unsupported request".into()));
         }
-        let limit = if path == "/v1/preferences" {
+        let limit = if matches!(path, "/v1/preferences" | "/v1/models/warmup") {
             4096
         } else {
             3 * 1024 * 1024

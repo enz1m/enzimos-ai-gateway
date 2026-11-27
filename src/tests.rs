@@ -48,6 +48,11 @@ fn local_default_and_explicit_cloud_without_fallback() {
 fn speech_stays_local_under_a_cloud_default() {
     let mut c = config("/run/x.sock", "https://api.example.com/v1/");
     c["default_provider"] = json!("cloud");
+    assert!(route(&c, &mut body(json!({})), "/v1/models/warmup").is_err());
+    assert!(matches!(
+        route(&c, &mut body(json!({"provider": "local", "model": "m"})), "/v1/models/warmup"),
+        Ok(Target::Local { path, .. }) if path == "/v1/models/warmup"
+    ));
     assert_eq!(
         route(&c, &mut body(json!({})), "/v1/audio/transcriptions").unwrap(),
         Target::Local {
